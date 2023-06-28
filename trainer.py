@@ -155,6 +155,7 @@ def hyperparam_tuner(X, y, n_classes, max_trials=10):
             objective="sparse_categorical_accuracy",
             max_trials=max_trials,
             seed=42,
+            epochs=100,
             hyperparameters=None,
             tune_new_entries=True,
             allow_new_entries=True,
