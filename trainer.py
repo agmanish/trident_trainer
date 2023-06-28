@@ -197,6 +197,7 @@ def hyperparam_tuner(X, y, n_classes, max_trials=10):
                 **trial.hyperparameters.values,
             }
             results_df = results_df.append(model_info, ignore_index=True)
+            print(results_df)
             # store the model if it meets the accuracy criterion and is better than the current best
             if metrics_dict["sparse_categorical_accuracy"] > 0.9 and (
                 not best_models or score > best_models[0][0]
