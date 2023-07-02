@@ -1,0 +1,101 @@
+Hi chat GPT You are going to generate a hyperparameter tuning script for me now, I will provide you with the architecture of my model, the hyper parameters i want you to tune and their possible values. Your job is to generate a script that can run training jobs, using the architecture and hyperparameters i provided, on an EC2 instance on aws.
+
+Data:
+    - The data is represntative of location information for many ships over a 1 hour period.
+    - The data is in the form of a 3D array of shape (num_trajectories, num_points_recieved=60, num_features=4[lat, long, open_angle, heading])
+    - open_angle is a caluclated feature tthat is defined as:
+    Definition 1. Trajectory:
+    Given a trajectory set $I = {T_1, T_2, T_3, ..., T_n}$ composed of a series of trajectories, where each trajectory is a series of multidimensional points in chronological order, expressed as $T_i = {p_1, p_2, p_3, ..., p_m}$ $(1 \leq i \leq n)$. $p_j$ $(1 \leq j \leq m)$ is a point in the trajectory, expressed as $(lat_j, lon_j, time_j)$. $TS_l = {pc_1, pc_2, pc_3, ..., pc_k}$ $(1 \leq c_1 \leq c_2 \leq c_3 \leq ... \leq c_k \leq m)$ is called a trajectory segment of $T_i$, and the set of all trajectory segments is called the trajectory segment set, which is expressed as $IS = {TS_1, TS_2, TS_3, ..., TS_h}$.
+
+    Definition 2. Open angle:
+    Three points ${P_1, P_2, P_3}$ in the trajectory segment form an angle $a$ less than $p$. If $a$ is less than the given threshold value $v$, then $a$ is called the open angle. The corresponding point of $a$ is the key point. $a$ is calculated by equation
+
+    $a = \arccos\left(\frac{a^2 + b^2 - c^2}{2ab}\right)$
+
+    - My dataset contains approx 9000 trajectories, each trajectory has 60 points, each point has 4 features.
+    - I also have an associated label array that contains the value 0 for straight, 1 for zigzag and 2 for loop.
+    - I want you to split the data into train, validation and test sets. I want you to use 80% of the data for training, 10% for validation and 10% for testing.
+    - I want you to use the train and validation sets to train the model and the test set to evaluate the model.
+    - Use a StratifiedKFold split to split the data into train, validation and test sets.
+
+
+
+Model Details:
+
+- Name: tridentTransformer
+- Architecture: Transformer encoder
+- Purpose: Trajectory classification
+- Classes: [Straights, ZigZags, Loops]
+
+Model Architecture:
+
+def transformer_encoder(
+    inputs,
+    head_size,
+    num_heads,
+    ff_dim,
+    dropout=0.0,
+    ):
+    x = keras.layers.LayerNormalization(epsilon=1e-6)(inputs)
+    x = keras.layers.MultiHeadAttention(
+        key_dim=head_size, num_heads=num_heads, dropout=dropout
+    )(x, x)
+    x = keras.layers.Dropout(dropout)(x)
+    res = x + inputs
+
+    x = keras.layers.LayerNormalization(epsilon=1e-6)(res)
+    x = keras.layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
+    x = keras.layers.Dropout(dropout)(x)
+    x = keras.layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
+
+    return x + res
+
+def build_model(
+    input_shape,
+    head_size,
+    num_heads,
+    ff_dim,
+    num_transformer_blocks,
+    mlp_units,
+    dropout=0,
+    n_classes=3,
+    mlp_dropout=0,
+    ):
+    inputs = keras.Input(shape=input_shape)
+    x = inputs
+    for _ in range(num_transformer_blocks):
+        x = transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
+
+    x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
+    i = 0
+
+    for dim in mlp_units:
+        x = layers.Dense(dim, activation="relu")(x)
+        x = layers.Dropout(mlp_dropout)(x)
+        i += 1
+    
+    outputs = layers.Dense(n_classes, activation="softmax")(x)
+
+Hyperparameters and their possible values:
+    - head_size : integer between 1 and 8 stride of 1
+    - num_heads : integer between 1 and 8 stride of 1
+    - ff_dim : integer between 1 and 9 stride of 1
+    - num_transformer_blocks : integer between 1 and 16 stride of 2
+    - mlp_units : list of lists, where each nested list contains a random combination of between 1 and 3 values from the set [16, 32, 64, 128, 256]
+    - dropout : float between 0 and 0.3
+    - mlp_dropout : float between 0 and 0.3
+    - learning_rate : [0.0001, 0.001, 0.01, 0.1]
+    - batch_size : [32, 64, 128, 256, 512, 1024]
+
+Requirements:
+    - Create a hyperparamter tuner that trains the model for a maximum of 25 epochs, and uses the validation accuracy as the metric to tune the hyperparameters.
+    - Repeat the same for each stratified split.
+    - Let the tuning process be guided to optimize the hyperparameters based on observed trends from previous runs.
+    - Once the training process for each set of hyperparameters is done for each stratified splir, evaluate its accuracy on the test set, the inference time and the size of the model.
+    - Store these metrics for each run in a csv file.
+
+    The csv should be structured with columns such as:
+
+    head_size, num_heads, ff_dim, num_transformer_blocks, mlp_units, dropout, mlp_dropout, learning_rate, batch_size, accuracy_set1, inference_time_set1, model_size_set1, accuracy_set2, inference_time_set2, model_size_set2, accuracy_set3, inference_time_set3, model_size_set3, accuracy_set4, inference_time_set4, model_size_set4, accuracy_set5, inference_time_set5, model_size_set5
+
+    also plug this into tenor board so that we can see the trends in the hyperparameters and the metrics.

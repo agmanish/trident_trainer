@@ -162,15 +162,15 @@ def hyperparam_tuner(X, y, n_classes, max_trials=10):
             project_name="trajectory_classification",
         )
 
-        stop_early = callbacks.EarlyStopping(monitor="val_loss", patience=9)
+        # stop_early = callbacks.EarlyStopping(monitor="val_loss", patience=9)
 
         tuner.search(
             x=X_train,
             y=y_train,
             epochs=100,
             validation_data=(X_val, y_val),
-            callbacks=[stop_early],
-            verbose=1,
+            # callbacks=[stop_early],
+            # verbose=1,
         )
 
         # Evaluate all models and store the results
@@ -231,6 +231,11 @@ def hyperparam_tuner(X, y, n_classes, max_trials=10):
     else:
         print("No model found that meets the accuracy criterion.")
         return None
+
+
+def get_hyperparams(hp):
+    ff_dim = hp.Int("ff_dim", min_value=1, max_value=9, step=1)
+    num_trans_blocks = hp.Int("ff_dim", min_value=1, max_value=9, step=1)
 
 
 if __name__ == "__main__":
